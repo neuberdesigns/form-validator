@@ -1,0 +1,13 @@
+{
+    "require": {
+        "respect/validation": "^0.9"
+    },
+    
+    "autoload": {
+    	"classmap": [
+    		"NDBaseForm.php",
+    		"NDSession.php",
+    		"NDValidator.php"
+    	]
+    }
+}
