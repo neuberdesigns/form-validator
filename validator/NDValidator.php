@@ -100,6 +100,7 @@ class NDValidator {
 			'notEmpty' => 'Campo {{name}} é obrigatório',
 			'email' => 'Campo {{name}} deve ser um e-mail valido',
 			'length' => 'Campo {{name}} é muito curto',
+			'date'=>'Campo {{name}} deve ser uma data válida'
 		);
 		
 		return $map;
