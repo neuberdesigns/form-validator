@@ -1,6 +1,8 @@
 {
     "require": {
-        "respect/validation": "^0.9"
+        "respect/validation": "^0.9",
+        "phpmailer/phpmailer": "^5.2",
+        "components/jquery": "^2.2"
     },
     
     "autoload": {

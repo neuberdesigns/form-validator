@@ -140,7 +140,37 @@ abstract class NDBaseForm {
 		return $send;
 	}
 	
-	public function sendMailPHPMailer(){}
+	public function sendMailPHPMailer(){
+		$message = array();
+		foreach($this->inputs as $key=>$value){
+			$field = $this->validator->getReadableName($key);
+			array_push($message, "$field: $value");
+		}
+		
+		$mail = new PHPMailer;
+		$mail->isSMTP();
+		$mail->Host = 'smtp.address';
+		$mail->SMTPAuth = true;                               // Enable SMTP authentication
+		$mail->Username = 'username';
+		$mail->Password = 'password';
+		$mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
+		$mail->Port = 587;                                    // TCP port to connect to
+
+		$mail->setFrom($this->sender);
+		$mail->addAddress($this->receiver);     // Add a recipient
+		$mail->addReplyTo($this->old('email'));
+		$mail->isHTML(false);                                  // Set email format to HTML
+
+		$mail->Subject = $this->subject;
+		$mail->Body    = implode("\n", $message);
+		
+		$send = $mail->send();
+		if( $send ){
+			$this->getSession()->set('form_sended', true);
+		}
+		
+		return $send;
+	}
 	
 	protected function getTextResponse(){}
 	
