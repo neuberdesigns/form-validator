@@ -1,16 +1,4 @@
-<?php
-date_default_timezone_set('America/Sao_Paulo');
-include_once 'ContactForm.php';
-$form = new ContactForm();
-
-if($_SERVER['REQUEST_METHOD']=='POST'){
-	$form->validate($_POST);
-	if( $form->fail() ){
-		header('Location: form.php');
-	}
-}
-?>
-
+<?php include_once 'ContactForm.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']=='POST'){
 			<p><font color="red"><?php echo $err ?></font></p>
 		<?php endforeach; ?>
 	<?php endif; ?>
-	<form action="" method="POST">
+	<form id="form-contact" method="POST" action="bla_blabla.php">
 		<div>
 			<label>Nome</label>
 			<input name="nome" value="<?php echo $form->old('nome')?>" />
@@ -41,4 +29,14 @@ if($_SERVER['REQUEST_METHOD']=='POST'){
 		<button type="submit">Enviar</button>
 	</form>
 </body>
+
+<script type="text/javascript" src="../validator/vendor/components/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../validator/validator.min.js"></script>
+<script type="text/javascript">
+	$('document').ready(function(){
+		var validator = new Validator();
+		validator.addFormElement('#form-contact', 'ContactForm.php');
+		validator.init();
+	});
+</script>
 </html> 

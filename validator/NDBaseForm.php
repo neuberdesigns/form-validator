@@ -18,7 +18,7 @@ abstract class NDBaseForm {
 	protected $errorsName = 'errors';
 	protected $errorsSulfix = null;
 	protected $sended = false;
-	protected $jsonResponse = false;
+	protected $ajaxResponse = false;
 	protected $rules = array();
 	
 	protected abstract function init();
@@ -34,10 +34,14 @@ abstract class NDBaseForm {
 		$this->handleRequest();
 	}
 	
-	protected function configMail($subject, $receiver, $sender=null){
+	protected function configMail($subject, $receiver, $sender=null, $useJson=false){
 		$this->subject = $subject;
 		$this->receiver = $receiver;
 		$this->sender = !empty($sender) ? $sender : $receiver;
+		
+		if($useJson){
+			$this->setAjaxResponse();
+		}
 	}
 	
 	public function addRule($key, $validation){
@@ -53,7 +57,10 @@ abstract class NDBaseForm {
 	}
 	
 	protected function handleRequest(){
-		if($this->isPost() || $this->isAjax()){
+		if($this->isAjax()){
+			$this->handleAjaxRequest();
+			
+		}else if($this->isPost()){
 			$this->validate($this->getRequestInputs());
 			
 			foreach($this->inputs as $input=>$value){
@@ -71,6 +78,38 @@ abstract class NDBaseForm {
 					$this->failCallback();
 				}
 			}
+		}
+	}
+	
+	protected function handleAjaxRequest(){
+		if($this->isAjax()){
+			$status = 400;
+			$this->validate($this->getRequestInputs());
+						
+			if($this->fail()){
+				$status = 400;
+				$json = array(
+					'errors'=>$this->validator->getErrors(),
+				);
+			}else{
+				$send = $this->sendMail();
+				if($send){
+					$status = 200;
+					$json = array(
+						'success'=>array('mail'=>'E-Mail enviado com sucesso'),
+					);
+				}else{
+					$status = 406;
+					$json = array(
+						'errors'=>array('mail'=>array('Erro ao enviar o email')),
+					);
+				}
+			}
+			
+			header(' ', true, $status);
+			//header(' ', true, 200);
+			header('Content-Type: application/json');
+			echo json_encode($json);
 		}
 	}
 	
@@ -142,9 +181,9 @@ abstract class NDBaseForm {
 	
 	public function sendMailPHPMailer(){}
 	
-	protected function getTextResponse(){}
-	
-	protected function getJsonResponse(){}
+	protected function setAjaxResponse(){
+		$this->ajaxResponse = true;
+	}
 	
 	public function getRequestInputs(){
 		return $_POST;

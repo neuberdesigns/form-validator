@@ -6,6 +6,11 @@ class ContactForm extends NDBaseForm {
 		$this->addRule('email', 'notEmpty|email');
 		$this->addRule('mensagem', 'notEmpty');
 		
-		$this->configMail('Contato', 'receiver@email.com.br');
+		$this->configMail('Contato', 'receiver@email.com.br', null, true);
 	}
+	
+	protected function successCallback(){}	
+	protected function failCallback(){}
 }
+
+$form = new ContactForm();
