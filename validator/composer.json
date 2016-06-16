@@ -9,7 +9,8 @@
     	"classmap": [
     		"NDBaseForm.php",
     		"NDSession.php",
-    		"NDValidator.php"
+            "NDValidator.php",
+    		"NDMailConfig.php"
     	]
     }
 }

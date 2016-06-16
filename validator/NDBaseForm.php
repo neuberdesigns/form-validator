@@ -1,14 +1,9 @@
 <?php
 date_default_timezone_set('America/Sao_Paulo');
-abstract class NDBaseForm {
-	const MAILER_MAIL = 'mail';
-	const MAILER_PHPMAILER = 'phpmailer';
-	
-	const SESSION_ERRORS = 'errors';
-	const SESSION_SENDED = 'sended';
-	
+abstract class NDBaseForm {	
 	protected $validator;
 	protected $session;
+	protected $mailConfig;
 	protected $inputs;
 	protected $passes;
 	
@@ -18,26 +13,25 @@ abstract class NDBaseForm {
 	protected $errorsName = 'errors';
 	protected $errorsSulfix = null;
 	protected $sended = false;
-	protected $jsonResponse = false;
+	protected $useAjax = false;
 	protected $rules = array();
 	
-	protected abstract function init();
-	protected abstract function successCallback();
-	protected abstract function failCallback();
+	protected abstract function setMailConfig($config);
+	protected abstract function setRules();
 	
-	public function __construct(){
+	protected function successCallback(){}
+	protected function failCallback(){}
+	
+	public function __construct($useAjax=false){
 		$this->validator = new NDValidator();
 		$this->session = new NDSession();
+		$this->session = new NDSession();
+		$this->mailConfig = new NDMailConfig();
 		
-		$this->init();
-		
+		$this->useAjax = $useAjax;
+		$this->setMailConfig($this->mailConfig);
+		$this->setRules();
 		$this->handleRequest();
-	}
-	
-	protected function configMail($subject, $receiver, $sender=null){
-		$this->subject = $subject;
-		$this->receiver = $receiver;
-		$this->sender = !empty($sender) ? $sender : $receiver;
 	}
 	
 	public function addRule($key, $validation){
@@ -53,7 +47,12 @@ abstract class NDBaseForm {
 	}
 	
 	protected function handleRequest(){
-		if($this->isPost() || $this->isAjax()){
+		$isPost = $this->isPost();
+		$isAjax = $this->isAjax();
+		$status = 400;
+		$json = array();
+		
+		if( $isPost || $isAjax ){
 			$this->validate($this->getRequestInputs());
 			
 			foreach($this->inputs as $input=>$value){
@@ -62,14 +61,33 @@ abstract class NDBaseForm {
 			
 			if($this->fail()){
 				$this->session->set($this->getErrorName(), $this->validator->getErrors());
+				$status = 400;
+				$json = array(
+					'errors'=>$this->validator->getErrors(),
+				);
 				$this->failCallback();
 			}else{
 				$send = $this->sendMail();
 				if($send){
+					$status = 200;
+					$json = array(
+						'success'=>array('mail'=>'E-Mail enviado com sucesso'),
+					);
 					$this->successCallback();
 				}else{
+					$status = 406;
+					$json = array(
+						'errors'=>array('mail'=>array('Erro ao enviar o email')),
+					);
 					$this->failCallback();
 				}
+			}
+			
+			if($this->useAjax){
+				header(' ', true, $status);
+				//header(' ', true, 200);
+				header('Content-Type: application/json');
+				echo json_encode($json);
 			}
 		}
 	}
@@ -109,72 +127,62 @@ abstract class NDBaseForm {
 		}
 	}
 	
-	public function sendMail($transport=self::MAILER_MAIL){
-		if($transport==self::MAILER_MAIL){
-			return $this->sendMailDefault();
-		}else if($transport==self::MAILER_PHPMAILER){
-			return $this->sendMailPHPMailer();
-		}
-	}
-	
-	public function sendMailDefault(){
-		$headers = array();
-		$message = array();
+	public function sendMail(){
+		$messageLines = array();
+		$message = '';
+		
 		foreach($this->inputs as $key=>$value){
 			$field = $this->validator->getReadableName($key);
-			array_push($message, "$field: $value");
+			array_push($messageLines, "$field: $value");
+		}
+		$message = implode("\n", $messageLines);
+		
+		$send = false;
+		if($this->mailConfig->getType()==NDMailConfig::MAILER_MAIL){
+			$send = $this->sendMailDefault($message);
+			
+		}else if($this->mailConfig->getType()==NDMailConfig::MAILER_PHPMAILER){
+			$send = $this->sendMailPHPMailer($message);
 		}
 		
-		array_push($headers, 'From:'.$this->sender);
-		array_push($headers, 'Return-Path:'.$this->sender);
+		if( $send ){
+			$this->getSession()->set('form_sended', true);
+		}
+		
+		return $send;
+	}
+	
+	public function sendMailDefault($message){
+		$headers = array();
+		array_push($headers, 'From: '.$this->mailConfig->getReceiverName().' <'.$this->mailConfig->getReceiver().'>');
+		array_push($headers, 'Return-Path:'.$this->mailConfig->getSender());
 		array_push($headers, 'Reply-To:'.$this->old('email'));
 		array_push($headers, 'X-Mailer: PHP/'.phpversion());
 		array_push($headers, 'Content-type:text/plain');
-		
-		$send = mail($this->receiver, $this->subject , implode("\n", $message), implode("\r\n", $headers), '-r'.$this->sender );
-		//$send = true;
-		
-		if( $send ){
-			$this->getSession()->set('form_sended', true);
-		}
-		return $send;
+				
+		return mail($this->mailConfig->getReceiver(), $this->mailConfig->getSubject() , $message, implode("\r\n", $headers), '-r'.$this->mailConfig->getSender());
 	}
 	
-	public function sendMailPHPMailer(){
-		$message = array();
-		foreach($this->inputs as $key=>$value){
-			$field = $this->validator->getReadableName($key);
-			array_push($message, "$field: $value");
-		}
-		
+	public function sendMailPHPMailer($message){
 		$mail = new PHPMailer;
 		$mail->isSMTP();
-		$mail->Host = 'smtp.address';
-		$mail->SMTPAuth = true;                               // Enable SMTP authentication
-		$mail->Username = 'username';
-		$mail->Password = 'password';
-		$mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
-		$mail->Port = 587;                                    // TCP port to connect to
+		$mail->SMTPAuth = true;
+		$mail->Host = $this->mailConfig->getHost();
+		$mail->Username = $this->mailConfig->getUsername();
+		$mail->Password = $this->mailConfig->getPassword();
+		$mail->SMTPSecure = $this->mailConfig->getSecure();
+		$mail->Port = $this->mailConfig->getPort();
 
-		$mail->setFrom($this->sender);
-		$mail->addAddress($this->receiver);     // Add a recipient
+		$mail->setFrom($this->mailConfig->getSender(), $this->mailConfig->getReceiverName());
+		$mail->addAddress($this->mailConfig->getReceiver());
 		$mail->addReplyTo($this->old('email'));
-		$mail->isHTML(false);                                  // Set email format to HTML
-
-		$mail->Subject = $this->subject;
-		$mail->Body    = implode("\n", $message);
+		$mail->isHTML(false);
 		
-		$send = $mail->send();
-		if( $send ){
-			$this->getSession()->set('form_sended', true);
-		}
+		$mail->Subject = $this->mailConfig->getSubject();
+		$mail->Body    = $message;
 		
-		return $send;
+		return $mail->send();
 	}
-	
-	protected function getTextResponse(){}
-	
-	protected function getJsonResponse(){}
 	
 	public function getRequestInputs(){
 		return $_POST;
