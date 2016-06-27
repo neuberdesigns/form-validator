@@ -15,9 +15,12 @@ abstract class NDBaseForm {
 	protected $sended = false;
 	protected $useAjax = false;
 	protected $rules = array();
+	protected $captcha = null;
 	
 	protected abstract function setMailConfig($config);
 	protected abstract function setRules();
+	protected function setCaptchaConfig(){}
+	protected function validateCaptcha($response){ return true; }
 	
 	protected function successCallback(){}
 	protected function failCallback(){}
@@ -31,6 +34,7 @@ abstract class NDBaseForm {
 		$this->useAjax = $useAjax;
 		$this->setMailConfig($this->mailConfig);
 		$this->setRules();
+		$this->setCaptchaConfig();
 		$this->handleRequest();
 	}
 	
@@ -61,35 +65,69 @@ abstract class NDBaseForm {
 			
 			if($this->fail()){
 				$this->session->set($this->getErrorName(), $this->validator->getErrors());
+				$errors = $this->validator->getErrors();
+				if($this->hasCaptcha() && !$this->hasCaptchaInput()){
+					$cap = $this->getCaptcha();
+					//$capError = $errors[$cap];
+					$errors['captcha'] = array("\n  O preenchimento do captcha é obrigatório");
+					unset($errors[$cap]);
+				}
 				$status = 400;
 				$json = array(
-					'errors'=>$this->validator->getErrors(),
+					'errors'=>$errors,
 				);
 				$this->failCallback();
 			}else{
-				$send = $this->sendMail();
-				if($send){
-					$status = 200;
-					$json = array(
-						'success'=>array('mail'=>'E-Mail enviado com sucesso'),
-					);
-					$this->successCallback();
+				$captchaResponse = @$this->inputs[$this->getCaptcha()];
+				
+				if($this->validateCaptcha($captchaResponse)){
+					$send = $this->sendMail();
+					if($send){
+						$status = 200;
+						$json = array(
+							'success'=>array('mail'=>'E-Mail enviado com sucesso'),
+						);
+						$this->successCallback();
+					}else{
+						$status = 406;
+						$json = array(
+							'errors'=>array('mail'=>array('Erro ao enviar o email')),
+						);
+						$this->failCallback();
+					}
 				}else{
-					$status = 406;
+					$status = 400;
 					$json = array(
-						'errors'=>array('mail'=>array('Erro ao enviar o email')),
+						'errors'=>array('Erro ao validar o captcha'),
 					);
-					$this->failCallback();
 				}
 			}
 			
 			if($this->useAjax){
-				header(' ', true, $status);
-				//header(' ', true, 200);
-				header('Content-Type: application/json');
-				echo json_encode($json);
+				$this->displayJson($json, $status);
 			}
 		}
+	}
+	
+	protected function sendRequest($url, $params=array(), $method="post"){
+		$ch = curl_init();
+
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_POST, $method=='post');
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+		$output = curl_exec ($ch);
+		curl_close ($ch);
+		
+		return $output;
+	}
+	
+	protected function displayJson($json, $status=200){
+		header(' ', true, $status);
+		//header(' ', true, 200);
+		header('Content-Type: application/json');
+		echo json_encode($json);
 	}
 	
 	public function getSession(){
@@ -132,6 +170,9 @@ abstract class NDBaseForm {
 		$message = '';
 		
 		foreach($this->inputs as $key=>$value){
+			if( $this->hasCaptcha() && $key==$this->getCaptcha())
+				continue;
+			
 			$field = $this->validator->getReadableName($key);
 			array_push($messageLines, "$field: $value");
 		}
@@ -182,6 +223,27 @@ abstract class NDBaseForm {
 		$mail->Body    = $message;
 		
 		return $mail->send();
+	}
+	
+	public function setCaptcha($name){
+		$this->captcha = $name;
+	}
+	
+	public function getCaptcha(){
+		return $this->captcha;
+	}
+	
+	public function hasCaptchaInput(){
+		$resp = false;
+		if(isset($this->inputs[$this->getCaptcha()])){
+			$capResp = trim($this->inputs[$this->getCaptcha()]);
+			$resp = !empty($capResp);
+		}
+		return $resp;
+	}
+	
+	public function hasCaptcha(){
+		return !empty($this->captcha);
 	}
 	
 	public function getRequestInputs(){
