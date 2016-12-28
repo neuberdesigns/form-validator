@@ -1,4 +1,4 @@
-<?php include_once 'ContactForm.php'; ?>
+<?php include_once 'contactForm.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,11 +6,6 @@
 	<title>Test Form Validator</title>
 </head>
 <body>
-	<?php if($form->hasError()): ?>
-		<?php foreach($form->getErrors(true) as $err): ?>
-			<p><font color="red"><?php echo $err ?></font></p>
-		<?php endforeach; ?>
-	<?php endif; ?>
 	<form id="form-contact" method="POST" action="bla_blabla.php">
 		<div>
 			<label>Nome</label>
@@ -27,6 +22,7 @@
 			<textarea name="mensagem"><?php echo $form->old('mensagem')?></textarea>
 		</div>
 		<button type="submit">Enviar</button>
+			
 	</form>
 </body>
 
