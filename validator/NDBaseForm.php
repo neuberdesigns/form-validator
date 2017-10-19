@@ -208,11 +208,12 @@ abstract class NDBaseForm {
 		$mail = new PHPMailer;
 		$mail->isSMTP();
 		$mail->SMTPAuth = true;
-		$mail->Host = $this->mailConfig->getHost();
+		$mail->Charset   = 'utf8_decode()';
+		$mail->Host = $this->mailConfig->getSmtp();
+		$mail->Port = $this->mailConfig->getPort();
 		$mail->Username = $this->mailConfig->getUsername();
 		$mail->Password = $this->mailConfig->getPassword();
 		$mail->SMTPSecure = $this->mailConfig->getSecure();
-		$mail->Port = $this->mailConfig->getPort();
 
 		$mail->setFrom($this->mailConfig->getSender(), $this->mailConfig->getReceiverName());
 		$mail->addAddress($this->mailConfig->getReceiver());
@@ -222,6 +223,10 @@ abstract class NDBaseForm {
 		$mail->Subject = $this->mailConfig->getSubject();
 		$mail->Body    = $message;
 		
+		if($this->mailConfig->debug){
+			$mail->SMTPDebug = $this->mailConfig->debugLevel;
+		}
+
 		return $mail->send();
 	}
 	

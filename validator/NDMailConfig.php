@@ -13,7 +13,12 @@ class NDMailConfig {
 	protected $username;
 	protected $password;
 	protected $secure = 'tls';
+	protected $smtp = '';
 	protected $port = 587;
+	
+	public $debug = false;
+	public $debugLevel = SMTP::DEBUG_CONNECTION;
+
 	
 	public function getReceiver(){
 		return $this->receiver;
@@ -64,6 +69,18 @@ class NDMailConfig {
 		
 		return $this;
 	}
+
+	public function enableDebug($level=null){
+		$this->debug = true;
+
+		if($level){
+			$this->debugLevel = $level;
+		}
+	}
+	
+	public function disableDebug(){
+		$this->debug = true;
+	}
 	
 	//Credentials
 	public function getHost(){
@@ -82,6 +99,10 @@ class NDMailConfig {
 		return $this->secure;
 	}
 	
+	public function getSmtp(){
+		return $this->smtp;
+	}
+	
 	public function getPort(){
 		return $this->port;
 	}
@@ -91,6 +112,7 @@ class NDMailConfig {
 		$this->host = $host;
 		$this->username = $user;
 		$this->password = $pass;
+		$this->smtp = $smtp;
 		$this->port = $port;
 		$this->secure = $secure;
 		
